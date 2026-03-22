@@ -17,6 +17,7 @@ local cowModule = {}
 cowModule.__index = cowModule -- Ik yall know what this means but, basically setting up hey if your reference this and it doesn't exist then look for it in the cowModule.
 function cowModule.new(cowModel) -- creates a new instance of the cow
 	local self = setmetatable({},cowModule) -- sets up the metatable so when you index it, it will look into cowModule
+	self.Model = cowModel
 	self.Humanoid = cowModel:FindFirstChild("Humanoid") --just a bunch of setting up stuff here for later
 	self.HumanoidRootPart = cowModel:FindFirstChild("HumanoidRootPart")
 	self.SkinPrompt = cowModel:FindFirstChild("HumanoidRootPart"):FindFirstChild("SkinCowPrompt")
@@ -51,7 +52,7 @@ function cowModule:MoveToRandom(multiplier)
 	end
 end
 function cowModule:DeathMoo() -- silly thing where the cow slowly moos on death
-	local sound = self.Model.Mesh.Sound
+	local sound = self..Mesh.Sound
 	sound.PlaybackSpeed = 0.8
 	sound:Play()
 
