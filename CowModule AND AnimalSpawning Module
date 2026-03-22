@@ -1,8 +1,8 @@
 -- Hello Hidden Dev People!
--- I just want to preface with the fact this is apart of my game "Villges" that has multiple different components and I decided to Share The CowModule that only works in context alongside another module the "CropAndAnimalSpawnerModule"
+-- I just want to preface with the fact this is apart of my game "Villages" that has multiple different components and I decided to Share The Cow Module that only works in context alongside another module the "CropAndAnimalSpawnerModule"
 -- So As Long as it's ok to include 2 modules for better context thanks!
 -- Also the Cows in game spawn a little bit away from the player when you first spawn in unless you spawn in the sandy desert then theres none,  but otherwise yes (I know these don't count towards the Length requirement! Thanks!)
---I'm not sure how thoroughly commented you want these but I'll tree and be thorough
+--I'm not sure how thoroughly commented you want these but I'll try and be thorough
 -- | Services | --
 local replicatedStorage = game:GetService("ReplicatedStorage")
 local pathFindingService = game:GetService("PathfindingService")
