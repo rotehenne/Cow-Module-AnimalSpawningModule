@@ -108,7 +108,7 @@ function cowModule:StartBehavior() -- the loop that as long as the cow is alive 
 			self:MoveToRandom()
 			task.wait(math.random(1,5))
 		end
-	end
+	end)
 end
 return cowModule
 --THATS IT FOR COW MODULE, BUT I THINK TO BETTER UNDERSTAND HOW THIS WORKS IN GAME I NEED TO INCLUDE THE SPAWNER MODULE, it also shows I have at least some knowledge of CFRAMES, trust me I got more but this module doesn't require anything complex (BELOW)--
