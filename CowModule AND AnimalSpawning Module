@@ -1,0 +1,232 @@
+-- Hello Hidden Dev People!
+-- I just want to preface with the fact this is apart of my game "Villges" that has multiple different components and I decided to Share The CowModule that only works in context alongside another module the "CropAndAnimalSpawnerModule"
+-- So As Long as it's ok to include 2 modules for better context thanks!
+-- Also the Cows in game spawn a little bit away from the player when you first spawn in unless you spawn in the sandy desert then theres none,  but otherwise yes (I know these don't count towards the Length requirement! Thanks!)
+--I'm not sure how thoroughly commented you want these but I'll tree and be thorough
+-- | Services | --
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local pathFindingService = game:GetService("PathfindingService")
+-- | Variables | -- 
+local params = 	{AgentRadius = 4,
+	AgentHeight = 6,
+	AgentCanJump = true} --Settings i'm going to use for pathfinding
+local randomModule = require(replicatedStorage.ModuleScripts.RandomChanceModule) -- very simple module I made just to return true if it generates a number lower or equal to the one you sent. So I can get like RNG
+-- | Constants | --
+local cowRange = 25
+local cowModule = {}
+cowModule.__index = cowModule -- Ik yall know what this means but, basically setting up hey if your reference this and it doesn't exist then look for it in the cowModule.
+function cowModule.new(cowModel) -- creates a new instance of the cow
+	local self = setmetatable({},cowModule) -- sets up the metatable so when you index it, it will look into cowModule
+	self.Humanoid = cowModel:FindFirstChild("Humanoid") --just a bunch of setting up stuff here for later
+	self.HumanoidRootPart = cowModel:FindFirstChild("HumanoidRootPart")
+	self.SkinPrompt = cowModel:FindFirstChild("HumanoidRootPart"):FindFirstChild("SkinCowPrompt")
+	self.BillBoardGui =  self.HumanoidRootPart:FindFirstChild("BillboardGui")
+	self.HealthBarGreen = self.BillBoardGui:FindFirstChild("HealthBar_Green")
+	self.HealthBarRed = self.BillBoardGui:FindFirstChild("HealthBar_Red")
+	self.Range = cowRange
+	self.Path = pathFindingService:CreatePath(params) -- individual path for each cow
+	return self
+end
+function cowModule:MoveToRandom(multiplier)
+	local range = self.Range 
+	if multiplier then -- if i want them to move extra far for some reason I have this, like if they get hurt
+		range *= multiplier
+	end
+	local offset = Vector3.new(math.random(-range,range),0,math.random(-range,range))
+	local randomDestination = self.HumanoidRootPart.Position +offset -- basically just move them to a random spot
+	self.Path:ComputeAsync(self.HumanoidRootPart.Position, randomDestination) -- actually computes the path
+	if self.Path.Status ~= Enum.PathStatus.Success then -- if it fails then exit
+		return
+	end
+
+	for _, waypoint in ipairs(self.Path:GetWaypoints()) do -- for each waypoint that is generated we move to each one unless we need to jump or it takes to long to finish the move(5 seconds)
+		if waypoint.Action == Enum.PathWaypointAction.Jump then
+			self.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+		self.Humanoid:MoveTo(waypoint.Position)
+		local reachedDestinationOnTime = self.Humanoid.MoveToFinished:Wait(5)
+		if not reachedDestinationOnTime then -- if it takes too long for some reason just exit the function
+			return
+		end
+	end
+end
+function cowModule:DeathMoo() -- silly thing where the cow slowly moos on death
+	local sound = self.Model.Mesh.Sound
+	sound.PlaybackSpeed = 0.8
+	sound:Play()
+
+end
+function cowModule:OnDeath() -- IF they die, health bar disappears and you can skin the cow and also they get flipped on their side
+	self:DeathMoo()
+	self.BillBoardGui.Enabled = false
+	self.SkinPrompt.Enabled = true
+	self.Model.Mesh.CanCollide = false
+	self.HumanoidRootPart.CFrame = self.HumanoidRootPart.CFrame * CFrame.Angles(0,0,math.rad(90)) --- super simple cframe rotation
+end
+function cowModule:SpeedBoost() -- Cows Speed up when they are hit 
+	if randomModule.percentChanceToHappen(20) then
+		self:Moo()
+	end
+	task.spawn(function() -- spawn a function that doesn't hinder the current thread that adds and removes a boost in walkspeed
+		self.Humanoid.WalkSpeed += 3.5 
+		task.wait(2)
+		self.Humanoid.WalkSpeed -= 3.5 
+	end)
+end
+function cowModule:OnHealthChanged() -- this fires when the humanoid.HealthChanged event happe s
+	if self.Humanoid.Health  ~= self.Humanoid.MaxHealth then 
+		self.BillBoardGui.Enabled = true
+		self.HealthBarGreen.Size = UDim2.new(self.Humanoid.Health/self.Humanoid.MaxHealth,0,self.HealthBarGreen.Size.Y.Scale,0) -- update to a percentage
+		self:SpeedBoost() -- calls the speed boost
+		self:MoveToRandom(2) -- they move farther because they are hurt
+	else 
+		self.BillBoardGui.Enabled = false
+	end
+end
+function cowModule:Initiate() -- this just sets up the connections that keep the health updated and that tell when the cow dies so we can do the OnDeath function
+	self.Humanoid.Died:Connect(function()
+		self:OnDeath()
+	end)
+	self.Humanoid.HealthChanged:Connect(function()
+		self:OnHealthChanged()
+	end)
+end
+function cowModule:Moo(volume) -- silly thing that just makes the cow moo, i added option to set volume but not sure if I'm gonna use it
+	self.Model.Mesh.Sound.Volume = volume or 0.25
+	self.Model.Mesh.Sound:Play()
+end
+function cowModule:StartBehavior() -- the loop that as long as the cow is alive they Move and Moo every 1-5 seconds
+	self.SkinPrompt.Enabled = false
+	self.BillBoardGui.Enabled = false --Disables things I don't want players to see yet
+	self.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true) -- so they can Jump if they want to when pathfinding
+	task.spawn(function()
+		while self.Humanoid.Health > 0  do
+			if randomModule.percentChanceToHappen(15) then -- the module i was talking about, 15% chance to moo when moving
+				self:Moo()
+			end
+			self:MoveToRandom()
+			task.wait(math.random(1,5))
+		end
+	end
+end
+return cowModule
+--THATS IT FOR COW MODULE, BUT I THINK TO BETTER UNDERSTAND HOW THIS WORKS IN GAME I NEED TO INCLUDE THE SPAWNER MODULE, it also shows I have at least some knowledge of CFRAMES, trust me I got more but this module doesn't require anything complex (BELOW)--
+--Its not OOP based because all I have is cows I want in game
+-- | Services | -- 
+local replicatedStorage = game:GetService("ReplicatedStorage")
+--| Variables | -- 
+local animalSpawnerPartFolder = game.Workspace.SpawnerPartsFolder.AnimalSpawnerPartFolder -- for all the AnimalSpawnParts
+local spawnerPartFolder = game.Workspace.SpawnerPartsFolder.CropSpawnerTripletFolder -- for crop spawning
+local NaturalResourceStructureFolder = replicatedStorage.NaturalResourceStructureFolder -- Holds 
+local replicatedAnimals = replicatedStorage. ReplicatedResourcesFolder.Animals -- the animal folder where cows are held
+local cowModule = require(replicatedStorage.ModuleScripts.CowModule) -- the cow module above
+local randomModule = require(replicatedStorage.ModuleScripts.RandomChanceModule) -- same random module
+-- | Constants | --
+local maxCowsOnServer = 130 -- spawn cap
+local minCows = 1 -- minmum of cows to spawn per spawner
+local maxCows = 4 -- maximum of cows to spawn per spawner
+local spawnerModule = {}
+
+function spawnerModule.setAllInvisible() -- All SpawnerParts Before the game starts are visible incase I want to manipulate them in studio, this makes them all invisible
+	for i , model in ipairs(spawnerPartFolder:GetChildren()) do
+		if model:IsA("Model") then
+			for i, child in ipairs(model:GetChildren()) do
+				if child:IsA("Part") then
+					child.Transparency  = 1
+					if child:FindFirstChild("Highlight") then
+						child:FindFirstChild("Highlight"):Destroy()
+					end
+				end
+			end
+		end
+	end
+
+	for i , model in ipairs(animalSpawnerPartFolder:GetChildren()) do -- sets animalSpawners Invisible
+		if model:IsA("Model") then
+
+			for i, child in ipairs(model:GetChildren()) do -- creates an array
+				if child:IsA("Part") then
+					child.Transparency  = 1
+					if child:FindFirstChild("Highlight") then
+						child:FindFirstChild("Highlight"):Destroy()
+
+					end
+				end
+			end
+		end
+	end
+end
+local function getCowsCount() -- just a little function to get how many cows are on the server in total
+	local Cowcount = 0
+	for i, child in ipairs(game.Workspace.Map.Animals:GetChildren()) do
+		if child.Name == "Cow_Model" then
+			Cowcount +=1
+		end
+	end
+	return Cowcount
+end
+local function spawnCowToLocation(cowClone, cframe) -- this uses the COW MODULE to create a new cowInstance and put it at the spawn part
+	cowClone.Parent = workspace.Map.Animals
+	cowClone:PivotTo(cframe) --  moves the entire model to the CFRAME
+	local cow = cowModule.new(cowClone)
+	cow:Initiate() -- sets up the connections in the module -->Health changed and OnDeath
+	cow:StartBehavior() -- sets up the moving and mooing behavior
+end
+function spawnerModule.CheckIfToSpawnNewResources()
+	for i , spawnerModel in ipairs(spawnerPartFolder:GetChildren()) do -- this is for food and crops IGNORE this  and go to CONTINUED if you want but i'll comment anyways
+		--For Crops
+		if spawnerModel:IsA("Model") then -- starts as models called crop triplets then for each part inside it moves that randomly choosen crop either Corn or Wheat to the part
+			local desiredCrop = NaturalResourceStructureFolder:FindFirstChild("Wheat_Plant") -- chooses what crop
+			if randomModule.percentChanceToHappen(50) then
+				desiredCrop = NaturalResourceStructureFolder:FindFirstChild("Corn_Stalk")
+			end
+			if spawnerModel.Name == "Fiber Spawn Triplet" then  -- unless it is dedicated Fiber Part then we spawn fiberplants
+				desiredCrop = NaturalResourceStructureFolder:FindFirstChild("Fiber_Plant")
+			end
+			for i, spawnerPart in ipairs(spawnerModel:GetChildren()) do
+				if spawnerPart:IsA("Part") then  --
+					local hasStuffSpawnedAlready = false
+					for i, touchingPart in ipairs (game.Workspace:GetPartsInPart(spawnerPart)) do-- checks if something is 		already there, if it is then don't spawn anything
+						if NaturalResourceStructureFolder:FindFirstChild(touchingPart.Parent.Name) then
+							hasStuffSpawnedAlready  = true
+						end
+					end
+					if hasStuffSpawnedAlready == false then
+						local clone = desiredCrop:Clone( )
+						clone.Parent = game.Workspace.NaturalResources
+						clone:PivotTo(spawnerPart.CFrame) -- Moves the desiredd crop to the right spot
+						clone.PrimaryPart.Anchored =  true
+					end
+				end 
+			end
+		end
+	end
+	--CONTINUED-- 
+	--For Animals (Cows)
+	for i , spawnerModel in ipairs(animalSpawnerPartFolder:GetChildren()) do-- for cows
+		if spawnerModel:IsA("Model") then -- starts as models called crop triplets then then
+			local desiredAnimal = replicatedAnimals:FindFirstChild("Cow_Model") -- chooses the animal, but all I want is cows
+			for i, spawnerPart in ipairs(spawnerModel:GetChildren()) do -- for each part in the array of children of the model
+				if spawnerPart:IsA("Part") then
+					local hasStuffSpawnedAlready = false
+					if hasStuffSpawnedAlready == false then
+						if spawnerPart.Name ~= "NonSpawnPart" then -- theres a non spawnpart that helps with manipulating the spawnpoints in workspace
+							--- since theres only one part per thing, set it to random number 1-3
+							local randomNumber = math.random(minCows,maxCows) -- 1 to 3 cows?
+							local amountOfCowsOnServer = getCowsCount()
+							if amountOfCowsOnServer + randomNumber < maxCowsOnServer then -- make sure we aren't going over cap
+								for i = 1, randomNumber do -- simple for loop
+									local clone = desiredAnimal:Clone()
+									if desiredAnimal.Name == "Cow_Model" then
+										spawnCowToLocation(clone,spawnerPart.CFrame)
+									end	
+								end
+							end																	
+						end		
+					end
+				end 
+			end
+		end
+	end
+end
+return spawnerModule -- Thank you for taking your time (:
